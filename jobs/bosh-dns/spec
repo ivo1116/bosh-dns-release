@@ -46,6 +46,9 @@ properties:
   log_level:
     description: Logging level (DEBUG, INFO, WARN, ERROR, NONE)
     default: INFO
+  log_dns_queries:
+    description: "When set to true, logs each DNS query at Info level including the requesting client's source address, so queries can be attributed to the originating client. Default false."
+    default: false
 
   api.port:
     description: "Port that the DNS servers debug API will listen on"
