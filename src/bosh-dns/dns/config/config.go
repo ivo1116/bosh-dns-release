@@ -39,6 +39,9 @@ type Config struct {
 
 	LogLevel string `json:"log_level,omitempty"`
 
+	// LogDNSQueries enables an opt-in query log including the client's source address.
+	LogDNSQueries bool `json:"log_dns_queries,omitempty"`
+
 	API APIConfig `json:"api"`
 
 	Health                HealthConfig          `json:"health"`

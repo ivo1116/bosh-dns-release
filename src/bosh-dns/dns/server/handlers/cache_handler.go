@@ -71,7 +71,7 @@ func (c CachingDNSHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		c.logger.Error(c.logTag, "Error getting dns cache:", err.Error())
 	}
 	if indicator.fromCache {
-		internal.LogRequest(c.logger, c, c.logTag, duration, r, dnsMsg, "")
+		internal.LogRequest(c.logger, c, c.logTag, duration, r, dnsMsg, "", internal.ClientAddr(w))
 	}
 }
 

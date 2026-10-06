@@ -266,7 +266,11 @@ var _ = Describe("ForwardHandler", func() {
 
 					logTag, logMessage, _ := fakeLogger.DebugArgsForCall(1)
 					Expect(logTag).To(Equal("ForwardHandler"))
-					Expect(logMessage).To(Equal(fmt.Sprintf("handlers.ForwardHandler Request id=%d qtype=[ANY] qname=["+casedQname+"] rcode=NOERROR ancount=1 recursor=127.0.0.1 time=0ns", m.Id)))
+					clientFragment := ""
+					if remoteAddrReturns != nil {
+						clientFragment = fmt.Sprintf("client=[%s] ", remoteAddrReturns.String())
+					}
+					Expect(logMessage).To(Equal(fmt.Sprintf("handlers.ForwardHandler Request id=%d qtype=[ANY] qname=["+casedQname+"] rcode=NOERROR ancount=1 %srecursor=127.0.0.1 time=0ns", m.Id, clientFragment)))
 				},
 				Entry("forwards query to recursor via udp for udp clients", "udp", nil),
 				Entry("forwards query to recursor via tcp for tcp clients", "tcp", &net.TCPAddr{}),

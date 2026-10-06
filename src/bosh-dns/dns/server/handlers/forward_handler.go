@@ -64,6 +64,8 @@ func (r ForwardHandler) ServeDNS(responseWriter dns.ResponseWriter, request *dns
 
 	client := r.exchangerFactory(network)
 
+	clientAddr := internal.ClientAddr(responseWriter)
+
 	err := r.recursors.PerformStrategically(func(recursor string) error {
 		exchangeAnswer, _, err := client.Exchange(request, recursor)
 
@@ -87,7 +89,7 @@ func (r ForwardHandler) ServeDNS(responseWriter dns.ResponseWriter, request *dns
 
 		r.truncater.TruncateIfNeeded(responseWriter, request, exchangeAnswer)
 
-		r.logRecursor(before, request, exchangeAnswer, "recursor="+recursor)
+		r.logRecursor(before, request, exchangeAnswer, "recursor="+recursor, clientAddr)
 		if writeErr := responseWriter.WriteMsg(exchangeAnswer); writeErr != nil {
 			r.logger.Error(r.logTag, "error writing response: %s", writeErr.Error())
 		}
@@ -97,16 +99,16 @@ func (r ForwardHandler) ServeDNS(responseWriter dns.ResponseWriter, request *dns
 
 	if err != nil {
 		responseMessage := r.createResponseFromError(request, err)
-		r.logRecursor(before, request, responseMessage, "error=["+err.Error()+"]")
+		r.logRecursor(before, request, responseMessage, "error=["+err.Error()+"]", clientAddr)
 		if err := responseWriter.WriteMsg(responseMessage); err != nil {
 			r.logger.Error(r.logTag, "error writing response: %s", err.Error())
 		}
 	}
 }
 
-func (r ForwardHandler) logRecursor(before time.Time, request *dns.Msg, response *dns.Msg, recursor string) {
+func (r ForwardHandler) logRecursor(before time.Time, request *dns.Msg, response *dns.Msg, recursor string, clientAddr string) {
 	duration := r.clock.Now().Sub(before).Nanoseconds()
-	internal.LogRequest(r.logger, r, r.logTag, duration, request, response, recursor)
+	internal.LogRequest(r.logger, r, r.logTag, duration, request, response, recursor, clientAddr)
 }
 
 func (ForwardHandler) network(responseWriter dns.ResponseWriter) string {

@@ -15,6 +15,11 @@ type RequestLoggerHandler struct {
 	logTag  string
 }
 
+// SetQueryLogging toggles the opt-in DNS query log.
+func SetQueryLogging(enabled bool) {
+	internal.SetQueryLogging(enabled)
+}
+
 func NewRequestLoggerHandler(child dns.Handler, clock clock.Clock, logger logger.Logger) RequestLoggerHandler {
 	return RequestLoggerHandler{
 		Handler: child,
@@ -37,5 +42,5 @@ func (h RequestLoggerHandler) ServeDNS(responseWriter dns.ResponseWriter, req *d
 
 	duration := h.clock.Now().Sub(before).Nanoseconds()
 
-	internal.LogRequest(h.logger, h.Handler, h.logTag, duration, req, dnsMsg, "")
+	internal.LogRequest(h.logger, h.Handler, h.logTag, duration, req, dnsMsg, "", internal.ClientAddr(responseWriter))
 }
