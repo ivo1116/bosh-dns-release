@@ -8,7 +8,24 @@ import (
 	"github.com/miekg/dns"
 )
 
-func LogRequest(logger logger.Logger, handler dns.Handler, logTag string, duration int64, request *dns.Msg, response *dns.Msg, customMessage string) {
+// queryLoggingEnabled gates the opt-in query log set via SetQueryLogging.
+var queryLoggingEnabled bool
+
+func SetQueryLogging(enabled bool) {
+	queryLoggingEnabled = enabled
+}
+
+func ClientAddr(rw dns.ResponseWriter) string {
+	if rw == nil {
+		return ""
+	}
+	if addr := rw.RemoteAddr(); addr != nil {
+		return addr.String()
+	}
+	return ""
+}
+
+func LogRequest(logger logger.Logger, handler dns.Handler, logTag string, duration int64, request *dns.Msg, response *dns.Msg, customMessage string, clientAddr string) {
 	types, domains := readQuestions(request)
 
 	if customMessage != "" {
@@ -22,18 +39,33 @@ func LogRequest(logger logger.Logger, handler dns.Handler, logTag string, durati
 		numAnswers = len(response.Answer)
 	}
 
-	logLine := fmt.Sprintf("%T Request id=%d qtype=[%s] qname=[%s] rcode=%s ancount=%d %stime=%dns",
+	clientFragment := ""
+	if clientAddr != "" {
+		clientFragment = fmt.Sprintf("client=[%s] ", clientAddr)
+	}
+
+	logLine := fmt.Sprintf("%T Request id=%d qtype=[%s] qname=[%s] rcode=%s ancount=%d %s%stime=%dns",
 		handler,
 		request.Id,
 		strings.Join(types, ","),
 		strings.Join(domains, ","),
 		dns.RcodeToString[rcode],
 		numAnswers,
+		clientFragment,
 		customMessage,
 		duration,
 	)
 
 	logger.Debug(logTag, logLine)
+
+	if queryLoggingEnabled && clientAddr != "" {
+		logger.Info(logTag, "dns-query client=[%s] qname=[%s] qtype=[%s] rcode=%s",
+			clientAddr,
+			strings.Join(domains, ","),
+			strings.Join(types, ","),
+			dns.RcodeToString[rcode],
+		)
+	}
 }
 
 func LogReceivedRequest(logger logger.Logger, handler dns.Handler, logTag string, request *dns.Msg) {

@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -83,7 +84,7 @@ var _ = Describe("RequestLoggerHandler", func() {
 					},
 					A: net.ParseIP("127.0.0.1"),
 				})
-				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "")
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "")
 
 				Expect(fakeLogger.DebugCallCount()).To(Equal(1))
 				_, message, _ := fakeLogger.DebugArgsForCall(0)
@@ -95,7 +96,7 @@ var _ = Describe("RequestLoggerHandler", func() {
 		Context("when passed a name error rcode", func() {
 			It("logs a debug message", func() {
 				dnsResponse.Rcode = dns.RcodeNameError
-				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "")
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "")
 
 				Expect(fakeLogger.DebugCallCount()).To(Equal(1))
 				_, message, _ := fakeLogger.DebugArgsForCall(0)
@@ -107,7 +108,7 @@ var _ = Describe("RequestLoggerHandler", func() {
 		Context("when passed a custom message", func() {
 			It("adds it to the log message", func() {
 				dnsResponse.Rcode = dns.RcodeSuccess
-				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "custom-message")
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "custom-message", "")
 
 				Expect(fakeLogger.DebugCallCount()).To(Equal(1))
 				_, message, _ := fakeLogger.DebugArgsForCall(0)
@@ -119,12 +120,65 @@ var _ = Describe("RequestLoggerHandler", func() {
 		Context("when passed a nil response", func() {
 			It("logs SRVFAIL", func() {
 				dnsResponse.Rcode = dns.RcodeNameError
-				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, nil, "")
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, nil, "", "")
 
 				Expect(fakeLogger.DebugCallCount()).To(Equal(1))
 				_, message, _ := fakeLogger.DebugArgsForCall(0)
 
 				Expect(message).To(Equal("handlers.RequestLoggerHandler Request id=123 qtype=[A] qname=[q-what.bosh.] rcode=SERVFAIL ancount=0 time=1ns"))
+			})
+		})
+
+		Context("when passed a client address", func() {
+			It("includes the client fragment in the debug line", func() {
+				dnsResponse.Rcode = dns.RcodeSuccess
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "10.255.0.42:54321")
+
+				Expect(fakeLogger.DebugCallCount()).To(Equal(1))
+				_, message, _ := fakeLogger.DebugArgsForCall(0)
+
+				Expect(message).To(Equal("handlers.RequestLoggerHandler Request id=123 qtype=[A] qname=[q-what.bosh.] rcode=NOERROR ancount=0 client=[10.255.0.42:54321] time=1ns"))
+			})
+
+			It("places the client fragment before a custom message", func() {
+				dnsResponse.Rcode = dns.RcodeSuccess
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "recursor=1.1.1.1", "10.255.0.42:54321")
+
+				_, message, _ := fakeLogger.DebugArgsForCall(0)
+				Expect(message).To(Equal("handlers.RequestLoggerHandler Request id=123 qtype=[A] qname=[q-what.bosh.] rcode=NOERROR ancount=0 client=[10.255.0.42:54321] recursor=1.1.1.1 time=1ns"))
+			})
+		})
+
+		Context("opt-in query logging", func() {
+			AfterEach(func() {
+				internal.SetQueryLogging(false)
+			})
+
+			It("does not emit an Info query log when disabled", func() {
+				internal.SetQueryLogging(false)
+				dnsResponse.Rcode = dns.RcodeSuccess
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "10.255.0.42:54321")
+
+				Expect(fakeLogger.InfoCallCount()).To(Equal(0))
+			})
+
+			It("emits an Info query log with the client identity when enabled", func() {
+				internal.SetQueryLogging(true)
+				dnsResponse.Rcode = dns.RcodeSuccess
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "10.255.0.42:54321")
+
+				Expect(fakeLogger.InfoCallCount()).To(Equal(1))
+				_, format, args := fakeLogger.InfoArgsForCall(0)
+				line := fmt.Sprintf(format, args...)
+				Expect(line).To(Equal("dns-query client=[10.255.0.42:54321] qname=[q-what.bosh.] qtype=[A] rcode=NOERROR"))
+			})
+
+			It("does not emit an Info query log when the client address is empty", func() {
+				internal.SetQueryLogging(true)
+				dnsResponse.Rcode = dns.RcodeSuccess
+				internal.LogRequest(fakeLogger, handler, "mytag", 1, dnsRequest, dnsResponse, "", "")
+
+				Expect(fakeLogger.InfoCallCount()).To(Equal(0))
 			})
 		})
 	})

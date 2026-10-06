@@ -74,6 +74,7 @@ func mainExitCode() int {
 	}
 
 	logger := boshlog.NewAsyncWriterLogger(level, os.Stdout)
+	handlers.SetQueryLogging(config.LogDNSQueries)
 	if config.UseRFC3339Formatting() {
 		logger.UseRFC3339Timestamps()
 	}
